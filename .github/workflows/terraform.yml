@@ -1,0 +1,67 @@
+# Define the name of the workflow
+name: Terraform Setup
+
+# Trigger the workflow manually and provide input parameters
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      destroy:
+        type: boolean
+        description: "Destroy Stack"
+        default: false
+        required: false
+
+# Define permissions for the workflow
+permissions:
+  contents: read
+
+# Define jobs for the workflow
+jobs:
+  # Setup job for Terraform
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Install Terraform
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      # Initialize Terraform
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      # Validate Terraform configuration
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+
+      # Create Terraform plan
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -out="out.plan"
+
+      # Apply Terraform changes (if destroy input is false)
+      - name: Terraform Apply
+        if: github.event.inputs.destroy == 'false'
+        id: apply
+        run: terraform apply out.plan
+
+      # Destroy Terraform resources (if destroy input is true)
+      - name: Terraform Destroy
+        if: github.event.inputs.destroy == 'true'
+        id: destroy
+        run: terraform destroy --auto-approve
